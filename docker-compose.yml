@@ -1,24 +1,21 @@
 services:
-  db:
-    image: postgres:18.4-alpine
+  mysql:
+    image: mysql:9.7
+    ports:
+      - "3306:3306"
     environment:
-      POSTGRES_DB: petclinic
-      POSTGRES_USER: petclinic
-      POSTGRES_PASSWORD: petclinic
+      - MYSQL_ROOT_PASSWORD=
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+      - MYSQL_USER=petclinic
+      - MYSQL_PASSWORD=petclinic
+      - MYSQL_DATABASE=petclinic
+    volumes:
+      - "./conf.d:/etc/mysql/conf.d:ro"
+  postgres:
+    image: postgres:18.4
     ports:
       - "5432:5432"
-    volumes:
-      - petclinic-data:/var/lib/postgresql
-
-  web:
-    image: azrakarakaya/spring-petclinic-app:2
-    ports:
-      - "8080:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=postgres
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/petclinic
-    depends_on:
-      - db
-
-volumes:
-  petclinic-data:
+      - POSTGRES_PASSWORD=petclinic
+      - POSTGRES_USER=petclinic
+      - POSTGRES_DB=petclinic
