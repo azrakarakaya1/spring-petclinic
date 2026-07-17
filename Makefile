@@ -8,4 +8,4 @@ restart:
 down:
 	docker compose down -v
 
-.PHONY: run stop up down restart
+.PHONY: up down restart
