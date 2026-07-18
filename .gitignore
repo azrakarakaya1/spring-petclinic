@@ -46,6 +46,3 @@ out/
 _site/
 *.css
 !petclinic.css
-
-# Custom files
-build.sh
