@@ -10,11 +10,13 @@ down:
 # cluster operations
 cluster-start:
 	minikube start -p petclinic --driver=docker
-apply-manifests: cluster-start
-	./scripts/apply-k8s.sh
+apply-manifests:
+	./scripts/apply_k8s.sh
 clean-manifests:
-	./scripts/apply-k8s.sh clean
+	./scripts/apply_k8s.sh clean
 cluster-stop: clean-manifests
 	minikube stop -p petclinic
+cluster-status:
+	minikube status -p petclinic
 
 .PHONY: up down restart cluster-start apply-manifests clean-manifests cluster-stop
