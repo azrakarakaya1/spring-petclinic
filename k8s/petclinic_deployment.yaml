@@ -1,0 +1,33 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: petclinic-deployment
+  labels:
+    app: spring-petclinic
+    type: backend
+spec:
+  template:
+    metadata:
+      name: petclinic-pod
+      labels:
+        app: spring-petclinic
+        type: backend
+    spec:
+      containers:
+      - name: web
+        image: azrakarakaya/spring-petclinic-app:2
+        env:
+          - name: SPRING_PROFILES_ACTIVE
+            value: postgres
+          - name: SPRING_DATASOURCE_URL
+            value: jdbc:postgresql://postgres-service:5432/petclinic
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      type: backend

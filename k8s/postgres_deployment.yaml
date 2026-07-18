@@ -1,0 +1,42 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  labels:
+    app: postgres
+    type: database
+spec:
+  template:
+    metadata:
+      name: postgres-pod
+      labels:
+        app: postgres
+        type: database
+    spec:
+      volumes:
+        - name: petclinic-data-volume
+          persistentVolumeClaim:
+            claimName: petclinic-data
+      containers:
+      - name: db
+        image: postgres:15-alpine
+        env:
+          - name: POSTGRES_DB
+            value: petclinic
+          - name: POSTGRES_USER
+            value: petclinic
+          - name: POSTGRES_PASSWORD
+            value: petclinic
+        volumeMounts:
+          - mountPath: "/var/lib/postgresql/data"
+            name: petclinic-data-volume
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      type: database
