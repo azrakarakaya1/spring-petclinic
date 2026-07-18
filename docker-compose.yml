@@ -11,7 +11,7 @@ services:
       - petclinic-data:/var/lib/postgresql
 
   web:
-    image: azrakarakaya/spring-petclinic-app:2
+    image: azrakarakaya/spring-petclinic-app:3
     ports:
       - "8080:8080"
     environment:
