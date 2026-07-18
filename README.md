@@ -4,9 +4,13 @@ This repository is based on the official Spring PetClinic sample application.
 
 Original repository: https://github.com/spring-projects/spring-petclinic
 
-For this case study, I selected Spring PetClinic app to practise DevOps concepts in a technology stack outside of my previous experience.
+For this case study, I selected Spring PetClinic app to practise DevOps concepts in a technology stack outside of my previous experience. 
 
-### Requirements
+
+---
+
+
+## Requirements
 
 Following tools must be installed before running the project:
 
@@ -17,67 +21,49 @@ Following tools must be installed before running the project:
 - Make
 
 
-### How to run the app?
+---
 
-1. Docker Compose
 
-```
-make up
-make down
-make restart
-```
+## How to run the app?
 
-2. Kubernetes
+The application can be deployed using either Docker Compose or Kubernetes manifests. I deployed the application with Docker Compose first. Then, I created Kubernetes manifests to create the same setup in a Minikube cluster.
+
+### 1. Docker Compose
 
 ```
-make cluster-start
-make cluster-stop
-make cluster-status
+make up 
+```
+Starts the application and the PostgreSQL database
+
+### 2. Kubernetes Manifests
+
+```
 make apply-manifests
-make clean-manifests
 ```
+Creates the cluster if not exists and deploys Kubernetes resources
 
-How did I develop this structure?
-Methodology: Run the app with docker compose first without any k8s requirements and write k8s manifests that does the same in a minikube cluster.
-
-
-*Makefile*
-
-bash ````
-# default settings are for docker compose
-up:
-	docker compose up -d
-restart:
-	docker compose down -v
-	docker compose up -d
-down:
-	docker compose down -v
-
-# cluster operations
-cluster-start:
-	minikube start -p petclinic --driver=docker
-apply-manifests: cluster-start
-	./scripts/apply-k8s.sh
-clean-manifests:
-	./scripts/apply-k8s.sh clean
-cluster-stop: clean-manifests
-	minikube stop -p petclinic
-cluster-status:
-	minikube status -p petclinic
-
-.PHONY: up down restart cluster-start apply-manifests clean-manifests cluster-stop
-```
+---
 
 
-### Project Steps
+## Project Steps
 
-#### Dockerize the App
+### Step 1: Select an Application
 
-*Dockerfile*
+I selected the Spring PetClinic app (Java): https://github.com/spring-projects/spring-petclinic
+
+### Step 2: Dockerize the App
+
+For this step, I wrote 3 files:
+* Dockerfile
+* build.sh
+* docker-compose.yml
+
+The **Dockerfile** creates a Docker image for the Spring PetClinic application using a multi-stage build. It starts both services and creates a Docker volume.
 
 <details>
 <summary>See Dockerfile</summary>
-```Dockerfile
+    
+```
 FROM bellsoft/liberica-runtime-container:jdk-21-stream-musl AS builder
 
 COPY . /home/app/spring-petclinic
@@ -93,18 +79,19 @@ COPY --from=builder /home/app/spring-petclinic/target/*.jar app.jar
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
+
 </details>
 
-
-*build.sh*
+The **build.sh** script builds the Docker image and pushes it to Docker Hub by running:
 
 ```
-./build.sh
+./build.sh <tag>
 ```
 
 <details>
 <summary>See build.sh</summary>
-````build.sh
+    
+```
 version=$1
 
 docker build -t azrakarakaya/spring-petclinic-app:$version .
@@ -112,14 +99,12 @@ docker push azrakarakaya/spring-petclinic-app:$version
 ```
 </details>
 
-- Explain 3 different images builded with 3 different base images and why did I choose bellsoft and multistaging
-
-
-*docker-compose.yml*
+The **docker-compose.yml** file defines the Spring PetClinic app and the PostgreSQL database for Docker Compose. It creates se, sets the required environment variables, connects them through the same network, and uses a Docker volume to keep the database data.
 
 <details>
 <summary>See docker-compose.yml</summary>
-````docker-compose.yml
+    
+```
 services:
   db:
     image: postgres:18.4-alpine
@@ -148,28 +133,30 @@ volumes:
 </details>
 
 
+### Step 3: Setup a Minikube Cluster
 
-#### Setup Minikube Cluster
+In this step, I created a local Kubernetes cluster using Minikube. Using the following commands, you can start the cluster and check its status:
 
 ```
 make cluster-start
 make cluster-status
 ```
 
-- How to make docker the main driver?
-
-
-#### K8s Manifests
+### Step 4: K8s Manifests
 
 * k8s/*
 * scripts/apply-k8s.sh
 
+(current work)
 
 
-#### Makefile
+### Makefile
+
+I find it easier to run common Docker Compose and Kubernetes commands using a Makefile. This way, I can manage both environments using a single file with simplified commands.
 
 <details>
 <summary>See Makefile</summary>
+
 ```
 # default settings are for docker compose
 up:
@@ -196,11 +183,31 @@ cluster-status:
 ```
 </details>
 
+Docker Compose commands:
+
+```
+make up             # Starts the application and the PostgreSQL database 
+make down           # Stops and removes containers and volumes
+make restart        # Restarts the setup
+```
+
+Cluster-related commands:
+
+```
+make cluster-start          # Starts the Minikube cluster
+make cluster-status         # Shows the current status of the cluster
+make apply-manifests        # Deploys Kubernetes resources
+make clean-manifests        # Removes deployments and services
+make cluster-stop           # Removes resources and stops the cluster
+```
+
 ### Checks
 
 - Evaluate its usability for production environments
 - Evaluate if the provided scripts are shell compatible
 - State limitations
+- Explain 3 different images builded with 3 different base images and why did I choose bellsoft and multistaging
+- Add how to make docker the main driver?
 
 
 ### References
