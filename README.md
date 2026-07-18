@@ -99,7 +99,7 @@ docker push azrakarakaya/spring-petclinic-app:$version
 ```
 </details>
 
-The **docker-compose.yml** file defines the Spring PetClinic app and the PostgreSQL database for Docker Compose. It creates se, sets the required environment variables, connects them through the same network, and uses a Docker volume to keep the database data.
+The **docker-compose.yml** file defines the Spring PetClinic app and the PostgreSQL database. It starts both services and creates a Docker volume for persistent data storage.
 
 <details>
 <summary>See docker-compose.yml</summary>
@@ -201,25 +201,29 @@ make clean-manifests        # Removes deployments and services
 make cluster-stop           # Removes resources and stops the cluster
 ```
 
-### Checks
+---
 
+## Insights
+
+- Explain 3 different images builded with 3 different base images and why did I choose bellsoft and how multistaging, compiling while building image or inside the container.
+- Add how to make docker the main driver?
+- ClusterIP service type and port forwarding method
+- PersistentVolumeClaim (PVC) in K8s
 - Evaluate its usability for production environments
 - Evaluate if the provided scripts are shell compatible
 - State limitations
-- Explain 3 different images builded with 3 different base images and why did I choose bellsoft and multistaging
-- Add how to make docker the main driver?
 
+Notes: Add image of the app and a flowchart that shows how each make command runs which files/commands
 
-### References
+---
 
-Dockerfile multi-staging reference: https://medium.com/@cat.edelveis/a-guide-to-docker-multi-stage-builds-for-spring-boot-08e3a64c9812
+## References
 
-Cluster setup instructions: https://kubernetes.io/docs/tutorials/kubernetes-basics/create-cluster/cluster-intro/ 
-
-Using Docker Desktop as driver: https://minikube.sigs.k8s.io/docs/drivers/docker/
-
-Learning K8s objects:
-
-K8s rolling update deployment: https://octopus.com/devops/kubernetes-deployments/kubernetes-rolling-deployment/
-
-Port forwarding: https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/ 
+- Dockerfile multi-staging reference: https://medium.com/@cat.edelveis/a-guide-to-docker-multi-stage-builds-for-spring-boot-08e3a64c9812
+- Cluster setup instructions: https://kubernetes.io/docs/tutorials/kubernetes-basics/create-cluster/cluster-intro/
+- Using Docker Desktop as driver: https://minikube.sigs.k8s.io/docs/drivers/docker/
+- Learning K8s objects:
+- K8s rolling update deployment: https://octopus.com/devops/kubernetes-deployments/kubernetes-rolling-deployment/
+- Port forwarding: https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/
+- Using env variables in K8s manifests: https://www.mirantis.com/blog/cloud-native-5-minutes-at-a-time-using-kubernetes-secrets-with-environment-variables-and-volume-mounts/
+- Persistent storage in K8s: https://www.mirantis.com/blog/persistent-data-and-storage-with-kubernetes/
