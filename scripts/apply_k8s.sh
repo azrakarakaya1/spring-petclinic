@@ -8,7 +8,12 @@ then
     kubectl delete deployment postgres-deployment
     kubectl delete service petclinic-service
     kubectl delete service postgres-service
-    kubectl delete pvc petclinic-data
+    exit 0
+fi
+
+if [[ $clean == "clean-pvc" ]]
+then
+    kubectl delete pvc petclinic-data-claim
     exit 0
 fi
 
@@ -24,4 +29,4 @@ kubectl apply -f k8s/petclinic_service.yaml
 kubectl rollout status deployment/petclinic-deployment
 
 # port forward to make the app accessible at http://localhost:8080
-kubectl port-forward service/petclinic-service 8080:8080
+#kubectl port-forward service/petclinic-service 8080:8080

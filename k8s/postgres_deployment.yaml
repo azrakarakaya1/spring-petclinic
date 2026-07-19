@@ -15,22 +15,22 @@ spec:
         type: database
     spec:
       volumes:
-        - name: petclinic-data-volume
+        - name: petclinic-data
           persistentVolumeClaim:
-            claimName: petclinic-data
+            claimName: petclinic-data-claim
       containers:
-      - name: db
-        image: postgres:15-alpine
-        env:
-          - name: POSTGRES_DB
-            value: petclinic
-          - name: POSTGRES_USER
-            value: petclinic
-          - name: POSTGRES_PASSWORD
-            value: petclinic
-        volumeMounts:
-          - mountPath: "/var/lib/postgresql/data"
-            name: petclinic-data-volume
+        - name: db
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_DB
+              value: petclinic
+            - name: POSTGRES_USER
+              value: petclinic
+            - name: POSTGRES_PASSWORD
+              value: petclinic
+          volumeMounts:
+            - mountPath: "/var/lib/postgresql/data"
+              name: petclinic-data
   replicas: 1
   strategy:
     type: RollingUpdate
