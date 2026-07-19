@@ -5,14 +5,12 @@ metadata:
   name: petclinic-deployment
   labels:
     app: spring-petclinic
-    type: backend
 spec:
   template:
     metadata:
       name: petclinic-pod
       labels:
         app: spring-petclinic
-        type: backend
     spec:
       containers:
       - name: web
@@ -30,4 +28,4 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      type: backend
+      app: spring-petclinic

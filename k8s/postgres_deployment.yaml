@@ -5,14 +5,12 @@ metadata:
   name: postgres-deployment
   labels:
     app: postgres
-    type: database
 spec:
   template:
     metadata:
       name: postgres-pod
       labels:
         app: postgres
-        type: database
     spec:
       volumes:
         - name: petclinic-data
@@ -39,4 +37,4 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      type: database
+      app: postgres

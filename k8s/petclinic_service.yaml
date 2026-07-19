@@ -7,7 +7,6 @@ spec:
   type: ClusterIP
   selector:
       app: spring-petclinic
-      type: backend
   ports:
     - port: 8080
       targetPort: 8080
