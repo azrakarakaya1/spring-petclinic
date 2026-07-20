@@ -35,12 +35,23 @@ make up
 ```
 Starts the application and the PostgreSQL database
 
+
 ### 2. Kubernetes Manifests
+
+```
+make cluster-start
+```
+Creates the Minikube cluster
 
 ```
 make apply-manifests
 ```
-Creates the cluster if not exists and deploys Kubernetes resources
+Deploys Kubernetes resources
+
+```
+kubectl port-forward service/petclinic-service 8080:8080
+```
+Applies port forwarding to make the app accessible at http://localhost:8080
 
 ---
 
@@ -58,13 +69,13 @@ For this step, I wrote 3 files:
 * build.sh
 * docker-compose.yml
 
-The **Dockerfile** creates a Docker image for the Spring PetClinic application using a multi-stage build. It starts both services and creates a Docker volume.
+The **Dockerfile** creates a Docker image for the Spring PetClinic application using a multi-stage build.
 
 <details>
 <summary>See Dockerfile</summary>
     
 ```
-FROM bellsoft/liberica-runtime-container:jdk-21-stream-musl AS builder
+FROM bellsoft/liberica-runtime-container:jdk-21-stream-musl
 
 COPY . /home/app/spring-petclinic
 WORKDIR /home/app/spring-petclinic
@@ -75,7 +86,7 @@ FROM bellsoft/liberica-runtime-container:jre-21-musl
 WORKDIR /home/app
 EXPOSE 8080
 
-COPY --from=builder /home/app/spring-petclinic/target/*.jar app.jar
+COPY --from=0 /home/app/spring-petclinic/target/*.jar app.jar
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
@@ -107,7 +118,7 @@ The **docker-compose.yml** file defines the Spring PetClinic app and the Postgre
 ```
 services:
   db:
-    image: postgres:18.4-alpine
+    image: postgres:15-alpine
     environment:
       POSTGRES_DB: petclinic
       POSTGRES_USER: petclinic
@@ -115,7 +126,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - petclinic-data:/var/lib/postgresql
+      - petclinic-data:/var/lib/postgresql/data
 
   web:
     image: azrakarakaya/spring-petclinic-app:3
@@ -144,6 +155,49 @@ make cluster-status
 
 ### Step 4: K8s Manifests
 
+For this step, I wrote 5 Kubernetes manifests and a script that applies them all starting with the database.
+
+The **apply_k8s.sh** 
+
+<details>
+<summary>See docker-compose.yml</summary>
+    
+```
+#!/bin/bash
+
+clean=$1
+
+if [[ $clean == "clean" ]]
+then
+    kubectl delete deployment petclinic-deployment
+    kubectl delete deployment postgres-deployment
+    kubectl delete service petclinic-service
+    kubectl delete service postgres-service
+    exit 0
+fi
+
+if [[ $clean == "clean-pvc" ]]
+then
+    kubectl delete pvc petclinic-data-claim
+    exit 0
+fi
+
+# database
+kubectl apply -f k8s/postgres_pvc.yaml
+kubectl apply -f k8s/postgres_deployment.yaml
+kubectl apply -f k8s/postgres_service.yaml
+kubectl rollout status deployment/postgres-deployment
+
+# backend
+kubectl apply -f k8s/petclinic_deployment.yaml
+kubectl apply -f k8s/petclinic_service.yaml
+kubectl rollout status deployment/petclinic-deployment
+
+# port forward to make the app accessible at http://localhost:8080
+#kubectl port-forward service/petclinic-service 8080:8080
+```
+</details>
+
 * k8s/*
 * scripts/apply-k8s.sh
 
@@ -170,16 +224,21 @@ down:
 # cluster operations
 cluster-start:
 	minikube start -p petclinic --driver=docker
-apply-manifests: cluster-start
-	./scripts/apply-k8s.sh
+apply-manifests:
+	chmod +x scripts/apply_k8s.sh
+	./scripts/apply_k8s.sh
 clean-manifests:
-	./scripts/apply-k8s.sh clean
+	chmod +x scripts/apply_k8s.sh
+	./scripts/apply_k8s.sh clean
+clean-pvc:
+	chmod +x scripts/apply_k8s.sh
+	./scripts/apply_k8s.sh clean-pvc
 cluster-stop: clean-manifests
 	minikube stop -p petclinic
 cluster-status:
 	minikube status -p petclinic
 
-.PHONY: up down restart cluster-start apply-manifests clean-manifests cluster-stop
+.PHONY: up down restart cluster-start apply-manifests clean-manifests cluster-stop clean-pvc cluster-status
 ```
 </details>
 
@@ -199,6 +258,7 @@ make cluster-status         # Shows the current status of the cluster
 make apply-manifests        # Deploys Kubernetes resources
 make clean-manifests        # Removes deployments and services
 make cluster-stop           # Removes resources and stops the cluster
+make clean-pvc              # Removes persistent volume claim and the data
 ```
 
 ---
@@ -206,12 +266,15 @@ make cluster-stop           # Removes resources and stops the cluster
 ## Insights
 
 - Explain 3 different images builded with 3 different base images and why did I choose bellsoft and how multistaging, compiling while building image or inside the container.
-- Add how to make docker the main driver?
+- Add how to make docker the main driver
 - ClusterIP service type and port forwarding method
 - PersistentVolumeClaim (PVC) in K8s
-- Evaluate its usability for production environments
+- Evaluate its usability for production environments (ingress controller instead of port forward)
 - Evaluate if the provided scripts are shell compatible
-- State limitations
+- State limitations (like docker compose healthcheck can be added)
+- For now, I use local volumes but in a production environment volumes should always be remote so 1 possible improvement is connecting to a neon postgres db
+- Changing service type to nodeport for external communication
+- Database can be deployed via Statefulset instead of a Deployment
 
 Notes: Add image of the app and a flowchart that shows how each make command runs which files/commands
 
@@ -219,10 +282,22 @@ Notes: Add image of the app and a flowchart that shows how each make command run
 
 ## References
 
-- Dockerfile multi-staging reference: https://medium.com/@cat.edelveis/a-guide-to-docker-multi-stage-builds-for-spring-boot-08e3a64c9812
-- Cluster setup instructions: https://kubernetes.io/docs/tutorials/kubernetes-basics/create-cluster/cluster-intro/
-- Using Docker Desktop as driver: https://minikube.sigs.k8s.io/docs/drivers/docker/
+- Dockerfile multi-staging reference:
+  - https://docs.docker.com/build/building/multi-stage/  
+  - https://medium.com/@cat.edelveis/a-guide-to-docker-multi-stage-builds-for-spring-boot-08e3a64c9812
+
+- Docker Compose & PostgreSQL:
+  - https://docs.docker.com/compose/how-tos/startup-order/
+  - https://jdbc.postgresql.org/documentation/use/ 
+  - https://dev.to/alexmercedcoder/a-deep-dive-into-docker-compose-27h5
+  - https://stackoverflow.com/questions/66808350/what-is-the-jdbc-connection-string-when-using-a-docker-container
+
+- Cluster setup:
+  - https://kubernetes.io/docs/tutorials/kubernetes-basics/create-cluster/cluster-intro/
+  - https://minikube.sigs.k8s.io/docs/drivers/docker/
+
 - Learning K8s objects:
+
 - K8s rolling update deployment: https://octopus.com/devops/kubernetes-deployments/kubernetes-rolling-deployment/
 - Port forwarding: https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/
 - Using env variables in K8s manifests: https://www.mirantis.com/blog/cloud-native-5-minutes-at-a-time-using-kubernetes-secrets-with-environment-variables-and-volume-mounts/
