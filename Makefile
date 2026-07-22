@@ -11,13 +11,10 @@ down:
 cluster-start:
 	minikube start -p petclinic --driver=docker
 apply-manifests:
-	chmod +x scripts/apply_k8s.sh
 	./scripts/apply_k8s.sh
 clean-manifests:
-	chmod +x scripts/apply_k8s.sh
 	./scripts/apply_k8s.sh clean
 clean-pvc:
-	chmod +x scripts/apply_k8s.sh
 	./scripts/apply_k8s.sh clean-pvc
 cluster-stop: clean-manifests
 	minikube stop -p petclinic
