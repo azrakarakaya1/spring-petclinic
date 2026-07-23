@@ -1,21 +1,18 @@
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: postgres-deployment
+  name: postgres-db
   labels:
     app: postgres
 spec:
+  serviceName: postgres-service
   template:
     metadata:
       name: postgres-pod
       labels:
         app: postgres
     spec:
-      volumes:
-        - name: petclinic-data
-          persistentVolumeClaim:
-            claimName: petclinic-data-claim
       containers:
         - name: db
           image: postgres:15-alpine
@@ -29,12 +26,17 @@ spec:
           volumeMounts:
             - mountPath: "/var/lib/postgresql/data"
               name: petclinic-data
+  volumeClaimTemplates:
+    - metadata:
+        name: petclinic-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        volumeMode: Filesystem
+        resources:
+          requests:
+            storage: 1Gi
   replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app: postgres
