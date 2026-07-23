@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - petclinic-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "petclinic"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   web:
     image: azrakarakaya/spring-petclinic-app:3
@@ -18,7 +23,8 @@ services:
       - SPRING_PROFILES_ACTIVE=postgres
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/petclinic
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   petclinic-data:
