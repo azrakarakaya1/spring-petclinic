@@ -29,3 +29,11 @@ kubectl wait --for=condition=ready pod --all
 
 # port forward to make the app accessible at http://localhost:8080
 #kubectl port-forward service/petclinic-service 8080:8080
+
+# ingress instead of port forwarding
+minikube addons enable ingress -p petclinic
+kubectl apply -f k8s/nginx_ingress.yaml
+
+#minikube service petclinic-service -p petclinic --url
+
+minikube tunnel -p petclinic
