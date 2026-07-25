@@ -21,4 +21,16 @@ cluster-stop: clean-manifests
 cluster-status:
 	minikube status -p petclinic
 
-.PHONY: up down restart cluster-start apply-manifests clean-manifests cluster-stop clean-pvc cluster-status
+# helm
+helm-install:
+	./scripts/helm.sh
+helm-upgrade-petclinic:
+	helm upgrade petclinic-release petclinic-chart
+helm-clean:
+	./scripts/helm.sh clean
+helm-clean-pvc:
+	./scripts/helm.sh clean-pvc
+
+.PHONY: up down restart \
+		cluster-start apply-manifests clean-manifests cluster-stop clean-pvc cluster-status \
+		helm-install helm-upgrade-petclinic helm-clean helm-clean-pvc
