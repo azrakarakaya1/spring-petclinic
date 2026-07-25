@@ -1,0 +1,32 @@
+replicaCount: 3
+
+image:
+  repository: azrakarakaya/spring-petclinic-app
+  tag: "3"
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+ingress:
+  rewriteTarget: /
+  host: petclinic.local
+  path: /
+  pathType: Prefix
+
+rollingUpdate:
+  maxSurge: 1
+  maxUnavailable: 0
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: postgres
+  - name: SPRING_DATASOURCE_URL
+    value: jdbc:postgresql://postgresql:5432/petclinic
+  - name: SPRING_DATASOURCE_USERNAME
+    value: petclinic
+  - name: SPRING_DATASOURCE_PASSWORD
+    value: petclinic
+labels:
+  app: spring-petclinic
