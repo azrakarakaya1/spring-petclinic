@@ -19,6 +19,7 @@ Following tools must be installed before running the project:
 - Minikube
 - kubectl
 - Make
+- Helm
 
 
 ---
@@ -49,9 +50,17 @@ make apply-manifests
 Deploys Kubernetes resources
 
 ```
-kubectl port-forward service/petclinic-service 8080:8080
+127.0.0.1  petclinic.local
 ```
-Applies port forwarding to make the app accessible at http://localhost:8080
+Add this line into /etc/hosts to direct requests to localhost
+
+```
+minikube tunnel -p petclinic
+````
+
+
+### 3. Helm
+
 
 ---
 
@@ -160,8 +169,7 @@ For this step, I wrote 5 Kubernetes manifests and a script that applies them all
 The **apply_k8s.sh** 
 
 <details>
-<summary>See docker-compose.yml</summary>
-    
+<summary>apply_k8s.sh</summary>
 ```
 #!/bin/bash
 
@@ -170,7 +178,7 @@ clean=$1
 if [[ $clean == "clean" ]]
 then
     kubectl delete deployment petclinic-deployment
-    kubectl delete deployment postgres-deployment
+    kubectl delete statefulset postgres-db
     kubectl delete service petclinic-service
     kubectl delete service postgres-service
     exit 0
@@ -178,30 +186,108 @@ fi
 
 if [[ $clean == "clean-pvc" ]]
 then
-    kubectl delete pvc petclinic-data-claim
+    kubectl delete pvc petclinic-data-postgres-db-0
     exit 0
 fi
 
 # database
-kubectl apply -f k8s/postgres_pvc.yaml
-kubectl apply -f k8s/postgres_deployment.yaml
+kubectl apply -f k8s/postgres_statefulset.yaml
 kubectl apply -f k8s/postgres_service.yaml
-kubectl rollout status deployment/postgres-deployment
 
 # backend
 kubectl apply -f k8s/petclinic_deployment.yaml
 kubectl apply -f k8s/petclinic_service.yaml
-kubectl rollout status deployment/petclinic-deployment
+
+kubectl wait --for=condition=ready pod --all
 
 # port forward to make the app accessible at http://localhost:8080
 #kubectl port-forward service/petclinic-service 8080:8080
+
+# ingress instead of port forwarding
+minikube addons enable ingress -p petclinic
+kubectl apply -f k8s/nginx_ingress.yaml
+
+#minikube service petclinic-service -p petclinic --url
+
+minikube tunnel -p petclinic
 ```
 </details>
 
-* k8s/*
-* scripts/apply-k8s.sh
+K8s manifests at early stages:
 
-(current work)
+- petclinic_deployment.yaml
+- petclinic_service.yaml
+- postgres_deployment.yaml
+- postgres_service.yaml
+- postgres_pvc.yaml
+
+At the beginning I used deployments for both the backend and the database services, and port forwarding for external connections to the cluster.
+
+**Updates:** 
+
+**Ingress Host:** I replaced kubectl port-forward with NGINX Ingress Controller using the petclinic.local alias.
+**StatefulSet for Db:** I converted the PostgreSQL database from a Deployment to a StatefulSet to have closer approach to production environments.
+
+The apply_k8s.sh script was updated accordingly.
+
+
+#### Helm 
+
+To learn helm and practise templating, a helm chart for petclinic sevice was created manually and the Bitnami PostgreSQL chart for database service is integrated.
+
+I used `helm create petclinic-chart` command to create a template for backend. First, I copied my existing service, deployment, and ingress manifests to the templates/ folder inside petclinic-chart. Then, I removed extra files and turned my manifests into templates by moving values of the key-value pairs to values.yaml. I also deleted all unused fields from values.yaml and updated Chart.yaml.
+
+For the database, **helm.sh** script located in the scripts/ folder is used to install the database and install/update the petclinic-chart.
+
+<details>
+<summary>See helm.sh</summary>
+```
+#!/bin/bash
+
+clean=$1
+
+if [[ $clean == "clean" ]]
+then
+    helm uninstall petclinic-release
+    helm uninstall postgresql
+    exit 0
+fi
+
+if [[ $clean == "clean-pvc" ]]
+then
+    kubectl delete pvc data-postgresql-0
+    exit 0
+fi
+
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+#helm pull bitnami/postgresql --untar
+
+helm install postgresql bitnami/postgresql \
+  --set auth.database=petclinic \
+  --set auth.username=petclinic \
+  --set auth.password=petclinic \
+  --set primary.persistence.size=1Gi
+
+helm install petclinic-release petclinic-chart/
+#helm upgrade petclinic-release petclinic-chart/
+
+kubectl wait --for=condition=ready pod --all --timeout=180s
+
+#minikube addons enable ingress
+#minikube tunnel
+```
+</details>
+
+
+
+### Step 5: CI Pipeline
+
+
+
+
+
 
 
 ### Makefile
@@ -210,7 +296,6 @@ I find it easier to run common Docker Compose and Kubernetes commands using a Ma
 
 <details>
 <summary>See Makefile</summary>
-
 ```
 # default settings are for docker compose
 up:
@@ -225,20 +310,29 @@ down:
 cluster-start:
 	minikube start -p petclinic --driver=docker
 apply-manifests:
-	chmod +x scripts/apply_k8s.sh
 	./scripts/apply_k8s.sh
 clean-manifests:
-	chmod +x scripts/apply_k8s.sh
 	./scripts/apply_k8s.sh clean
 clean-pvc:
-	chmod +x scripts/apply_k8s.sh
 	./scripts/apply_k8s.sh clean-pvc
 cluster-stop: clean-manifests
 	minikube stop -p petclinic
 cluster-status:
 	minikube status -p petclinic
 
-.PHONY: up down restart cluster-start apply-manifests clean-manifests cluster-stop clean-pvc cluster-status
+# helm
+helm-install:
+	./scripts/helm.sh
+helm-upgrade-petclinic:
+	helm upgrade petclinic-release petclinic-chart
+helm-clean:
+	./scripts/helm.sh clean
+helm-clean-pvc:
+	./scripts/helm.sh clean-pvc
+
+.PHONY: up down restart \
+		cluster-start apply-manifests clean-manifests cluster-stop clean-pvc cluster-status \
+		helm-install helm-upgrade-petclinic helm-clean helm-clean-pvc
 ```
 </details>
 
@@ -261,6 +355,10 @@ make cluster-stop           # Removes resources and stops the cluster
 make clean-pvc              # Removes persistent volume claim and the data
 ```
 
+Helm commands:
+
+
+
 ---
 
 ## Insights
@@ -268,13 +366,15 @@ make clean-pvc              # Removes persistent volume claim and the data
 - Explain 3 different images builded with 3 different base images and why did I choose bellsoft and how multistaging, compiling while building image or inside the container.
 - Add how to make docker the main driver
 - ClusterIP service type and port forwarding method
+- Ingress controller instead of port forward and Ingress host with minikube
 - PersistentVolumeClaim (PVC) in K8s
-- Evaluate its usability for production environments (ingress controller instead of port forward)
 - Evaluate if the provided scripts are shell compatible
 - State limitations (like docker compose healthcheck can be added)
 - For now, I use local volumes but in a production environment volumes should always be remote so 1 possible improvement is connecting to a neon postgres db
 - Changing service type to nodeport for external communication
 - Database can be deployed via Statefulset instead of a Deployment
+- healthcheck
+- rollout status vs wait
 
 Notes: Add image of the app and a flowchart that shows how each make command runs which files/commands
 
@@ -291,14 +391,39 @@ Notes: Add image of the app and a flowchart that shows how each make command run
   - https://jdbc.postgresql.org/documentation/use/ 
   - https://dev.to/alexmercedcoder/a-deep-dive-into-docker-compose-27h5
   - https://stackoverflow.com/questions/66808350/what-is-the-jdbc-connection-string-when-using-a-docker-container
+  - https://last9.io/blog/docker-compose-health-checks/
 
 - Cluster setup:
   - https://kubernetes.io/docs/tutorials/kubernetes-basics/create-cluster/cluster-intro/
   - https://minikube.sigs.k8s.io/docs/drivers/docker/
 
 - Learning K8s objects:
+  - https://github.com/kubernetes/kubectl/issues/1120
+  - K8s rolling update deployment: https://octopus.com/devops/kubernetes-deployments/kubernetes-rolling-deployment/
+  - Port forwarding: https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/
+  - Using env variables in K8s manifests: https://www.mirantis.com/blog/cloud-native-5-minutes-at-a-time-using-kubernetes-secrets-with-environment-variables-and-volume-mounts/
+  - Persistent storage in K8s: https://www.mirantis.com/blog/persistent-data-and-storage-with-kubernetes/
 
-- K8s rolling update deployment: https://octopus.com/devops/kubernetes-deployments/kubernetes-rolling-deployment/
-- Port forwarding: https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/
-- Using env variables in K8s manifests: https://www.mirantis.com/blog/cloud-native-5-minutes-at-a-time-using-kubernetes-secrets-with-environment-variables-and-volume-mounts/
-- Persistent storage in K8s: https://www.mirantis.com/blog/persistent-data-and-storage-with-kubernetes/
+- Ingress:
+  - https://v1-33.docs.kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/
+  - https://medium.com/@jadhav.swatissj99/ingress-controller-in-kubernetes-a-detailed-explanation-7dca42999df4
+  - https://medium.com/@chandan.chanddu/routing-strategies-in-kubernetes-host-based-and-path-based-routing-with-nginx-ingress-controller-28a35859b508
+  - https://medium.com/@saurabh_adhau/unlocking-the-magic-setting-up-ingress-on-minikube-with-nginx-ingress-controller-520ce1c3c3bc
+
+- Helm:
+  - https://www.ibm.com/think/insights/kustomize-vs-helm
+  - https://medium.com/@mahernaija/deploy-postgresql-on-kubernetes-using-helm-the-easy-way-f7f50f612509
+  - https://dev.to/alexmercedcoder/using-helm-with-kubernetes-a-guide-to-helm-charts-and-their-implementation-8dg
+  - https://glasskube.dev/blog/what-is-helm-in-kubernetes/
+
+- GitHub Actions:
+  - https://github.com/actions/setup-java
+  - https://github.com/marketplace/actions/helm-chart-repo-ghcr-io
+  - https://dev.to/hkhelil/ensuring-effective-helm-charts-with-linting-testing-and-diff-checks-ni0
+  - https://helm.sh/docs/helm/helm_registry_login/
+  - https://github.com/orgs/community/discussions/57724 
+  - https://docs.github.com/en/packages/learn-github-packages/introduction-to-github-packages
+  - https://medium.com/@chandika.s/github-actions-essentials-understanding-github-runners-in-github-actions-0102aefd73b1
+  - https://maven.apache.org/surefire/maven-surefire-plugin/examples/single-test.html 
+
+  
