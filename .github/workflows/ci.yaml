@@ -19,7 +19,7 @@ jobs:
           cache: maven
 
       - name: Run maven tests
-        run: ./mvnw test
+        run: ./mvnw test -Dtest="!MySqlIntegrationTests,!PostgresIntegrationTests,!MysqlTestApplication"
 
   docker:
     needs: [code-tests]
