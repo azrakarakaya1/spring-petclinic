@@ -44,14 +44,27 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Helm setup
-        run: curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+        uses: azure/setup-helm@v4
+        #run: curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
       
       - name: Check lint
         run: helm lint petclinic-chart
 
-  # helm-ci:
-  #   needs: [helm-lint]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  helm-ci:
+    needs: [helm-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Helm setup
+        uses: azure/setup-helm@v4
+      
+      - name: Helm registry login
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_USER: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u $GITHUB_USER --password-stdin
+      
+      - name: Build and push Helm chart to GHCR
+        run: bash ./scripts/helm_build.sh
