@@ -18,7 +18,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Run maven tests
+      - name: Run Maven tests
         run: ./mvnw test -Dtest="!MySqlIntegrationTests,!PostgresIntegrationTests,!MysqlTestApplication"
 
   docker:
@@ -28,19 +28,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Docker hub login
+      - name: Docker Hub login
         uses: docker/login-action@v3
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - run: bash ./scripts/build.sh ${{ github.sha }}
+      - name: Build and push Docker image
+        run: bash ./scripts/build.sh ${{ github.sha }}
 
-  # helm-lint:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Helm setup
+        run: curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+      
+      - name: Check lint
+        run: helm lint petclinic-chart
 
   # helm-ci:
   #   needs: [helm-lint]
