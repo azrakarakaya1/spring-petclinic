@@ -29,7 +29,7 @@ helm install postgresql bitnami/postgresql \
 helm install petclinic-release petclinic-chart/
 #helm upgrade petclinic-release petclinic-chart/
 
-kubectl wait --for=condition=ready pod --all
+kubectl wait --for=condition=ready pod --all --timeout=180s
 
-minikube addons enable ingress
+#minikube addons enable ingress
 #minikube tunnel
