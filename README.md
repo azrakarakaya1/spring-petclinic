@@ -59,9 +59,6 @@ minikube tunnel -p petclinic
 ````
 
 
-### 3. Helm
-
-
 ---
 
 
@@ -82,7 +79,7 @@ The **Dockerfile** creates a Docker image for the Spring PetClinic application u
 
 <details>
 <summary>See Dockerfile</summary>
-    
+
 ```
 FROM bellsoft/liberica-runtime-container:jdk-21-stream-musl
 
@@ -164,12 +161,11 @@ make cluster-status
 
 ### Step 4: K8s Manifests
 
-For this step, I wrote 5 Kubernetes manifests and a script that applies them all starting with the database.
-
-The **apply_k8s.sh** 
+For this step, I wrote 5 Kubernetes manifests and a script that applies them all starting with the database. I automated all using the **apply_k8s.sh** script.
 
 <details>
-<summary>apply_k8s.sh</summary>
+<summary>See apply_k8s.sh</summary>
+
 ```
 #!/bin/bash
 
@@ -226,6 +222,7 @@ At the beginning I used deployments for both the backend and the database servic
 **Updates:** 
 
 **Ingress Host:** I replaced kubectl port-forward with NGINX Ingress Controller using the petclinic.local alias.
+
 **StatefulSet for Db:** I converted the PostgreSQL database from a Deployment to a StatefulSet to have closer approach to production environments.
 
 The apply_k8s.sh script was updated accordingly.
@@ -241,6 +238,7 @@ For the database, **helm.sh** script located in the scripts/ folder is used to i
 
 <details>
 <summary>See helm.sh</summary>
+
 ```
 #!/bin/bash
 
@@ -281,13 +279,92 @@ kubectl wait --for=condition=ready pod --all --timeout=180s
 </details>
 
 
-
 ### Step 5: CI Pipeline
 
+I also added a CI pipeline for GitHub Actions that runs when code is pushed to main. It includes steps as:
 
+- Runs Maven unit tests and excludes DB integration tests since I changed the db configuration
+- Builds and pushes the Docker image to Docker Hub
+- Checks lints for the Helm chart
+- Packages and publishes the Helm chart to GHCR
 
+<details>
+<summary>See ci.yaml</summary>
 
+```
+name: Spring PetClinic App CI Pipeline
 
+on:
+  push:
+    branches: [main]
+
+jobs:
+  code-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'liberica'
+          java-version: '21'
+          cache: maven
+
+      - name: Run Maven tests
+        run: ./mvnw test -Dtest="!MySqlIntegrationTests,!PostgresIntegrationTests,!MysqlTestApplication"
+
+  docker:
+    needs: [code-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Docker Hub login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: bash ./scripts/build.sh ${{ github.sha }}
+
+  helm-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Helm setup
+        uses: azure/setup-helm@v4
+        #run: curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+      
+      - name: Check lint
+        run: helm lint petclinic-chart
+
+  helm-ci:
+    needs: [helm-lint]
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Helm setup
+        uses: azure/setup-helm@v4
+      
+      - name: Helm registry login
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_USER: ${{ github.actor }}
+        run: echo "$GITHUB_TOKEN" | helm registry login ghcr.io -u $GITHUB_USER --password-stdin
+      
+      - name: Build and push Helm chart to GHCR
+        run: bash ./scripts/helm_build.sh
+```
+</details>
 
 
 ### Makefile
@@ -296,6 +373,7 @@ I find it easier to run common Docker Compose and Kubernetes commands using a Ma
 
 <details>
 <summary>See Makefile</summary>
+    
 ```
 # default settings are for docker compose
 up:
@@ -357,6 +435,12 @@ make clean-pvc              # Removes persistent volume claim and the data
 
 Helm commands:
 
+```
+make helm-install
+make helm-upgrade-petclinic
+make helm-clean
+make helm-clean-pvc
+```
 
 
 ---
@@ -375,8 +459,6 @@ Helm commands:
 - Database can be deployed via Statefulset instead of a Deployment
 - healthcheck
 - rollout status vs wait
-
-Notes: Add image of the app and a flowchart that shows how each make command runs which files/commands
 
 ---
 
